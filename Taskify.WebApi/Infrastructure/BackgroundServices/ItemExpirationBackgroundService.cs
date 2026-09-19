@@ -44,7 +44,6 @@ public sealed class ItemExpirationBackgroundService(
         var count = await dbContext.Items
             .Where(x =>
                 !x.IsComplete &&
-                !x.IsDeleted &&
                 !x.IsExpired &&
                 x.DueDateOnUtc.HasValue &&
                 x.DueDateOnUtc <= utcNow)

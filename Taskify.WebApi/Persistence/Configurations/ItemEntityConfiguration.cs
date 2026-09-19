@@ -4,12 +4,12 @@ using Taskify.WebApi.Domain;
 
 namespace Taskify.WebApi.Persistence.Configurations;
 
-public class ItemEntityConfiguration:IEntityTypeConfiguration<Item>
+public class ItemEntityConfiguration : IEntityTypeConfiguration<Item>
 {
     public void Configure(EntityTypeBuilder<Item> builder)
     {
         builder.ToTable("Items");
-        
+
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Name)
@@ -18,5 +18,9 @@ public class ItemEntityConfiguration:IEntityTypeConfiguration<Item>
 
         builder.Property(x => x.Description)
             .HasMaxLength(5000);
+
+        builder.HasIndex(x => x.IsDeleted);
+
+        builder.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
