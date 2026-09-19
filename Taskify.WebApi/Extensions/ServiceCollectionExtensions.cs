@@ -30,12 +30,9 @@ public static class ServiceCollectionExtensions
     {
         services.AddSingleton(TimeProvider.System);
 
-        services.AddScoped(typeof(ValidationFilter<>));
-        services.AddValidatorsFromAssembly(typeof(ApplicationDbContext).Assembly, includeInternalTypes: true);
+        services.AddValidation();
 
-        services.AddProblemDetails();
-        services.AddExceptionHandler<ValidationExceptionHandler>();
-        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddExceptionHandling();
 
         services.AddApiVersioning();
     }
@@ -68,5 +65,18 @@ public static class ServiceCollectionExtensions
                 options.GroupNameFormat = "'v'VVV";
                 options.SubstituteApiVersionInUrl = true;
             });
+    }
+
+    private static void AddExceptionHandling(this IServiceCollection services)
+    {
+        services.AddProblemDetails();
+        services.AddExceptionHandler<ValidationExceptionHandler>();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+    }
+
+    private static void AddValidation(this IServiceCollection services)
+    {
+        services.AddScoped(typeof(ValidationFilter<>));
+        services.AddValidatorsFromAssembly(typeof(ApplicationDbContext).Assembly, includeInternalTypes: true);
     }
 }
