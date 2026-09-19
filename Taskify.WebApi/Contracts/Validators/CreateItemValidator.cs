@@ -1,7 +1,7 @@
 using FluentValidation;
 using Taskify.WebApi.Contracts.Requests;
 
-namespace Taskify.WebApi.Validators;
+namespace Taskify.WebApi.Contracts.Validators;
 
 internal sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
 {
