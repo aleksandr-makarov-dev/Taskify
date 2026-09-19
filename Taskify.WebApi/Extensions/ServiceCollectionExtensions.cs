@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Taskify.WebApi.Infrastructure.BackgroundServices;
 using Taskify.WebApi.Infrastructure.Filters;
 using Taskify.WebApi.Infrastructure.Middlewares;
 using Taskify.WebApi.Persistence;
@@ -29,6 +30,8 @@ public static class ServiceCollectionExtensions
     public static void AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+        
+        services.AddHostedService<ItemExpirationBackgroundService>();
 
         services.AddValidation();
 
