@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Taskify.WebApi.Infrastructure.Filters;
 using Taskify.WebApi.Infrastructure.Middlewares;
 using Taskify.WebApi.Persistence;
+using Taskify.WebApi.Persistence.Interceptors;
 
 namespace Taskify.WebApi.Extensions;
 
@@ -11,12 +12,24 @@ public static class ServiceCollectionExtensions
 {
     public static void AddPersistence(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddDbContext<ApplicationDbContext>(options => options
-            .UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+        services.AddScoped<AuditInterceptor>();
+        services.AddScoped<SoftDeleteInterceptor>();
+
+        services.AddDbContext<ApplicationDbContext>((provider, options) =>
+        {
+            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"));
+
+            options.AddInterceptors(
+                provider.GetRequiredService<SoftDeleteInterceptor>(),
+                provider.GetRequiredService<AuditInterceptor>()
+            );
+        });
     }
 
     public static void AddInfrastructure(this IServiceCollection services)
     {
+        services.AddSingleton(TimeProvider.System);
+
         services.AddScoped(typeof(ValidationFilter<>));
         services.AddValidatorsFromAssembly(typeof(ApplicationDbContext).Assembly, includeInternalTypes: true);
 
