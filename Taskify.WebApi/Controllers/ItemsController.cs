@@ -15,19 +15,6 @@ namespace Taskify.WebApi.Controllers;
 [Route("api/v{version:apiVersion}/items")]
 public class ItemsController(ApplicationDbContext dbContext, TimeProvider timeProvider) : ControllerBase
 {
-    [HttpPost]
-    [Validate(typeof(CreateItemRequest))]
-    public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest request,
-        CancellationToken cancellationToken)
-    {
-        var item = request.ToItem();
-
-        dbContext.Items.Add(item);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return Ok(item.ToItemDetailsResponse());
-    }
-
     [HttpGet]
     public async Task<IActionResult> GetItems(CancellationToken cancellationToken)
     {
@@ -38,7 +25,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
 
         return Ok(items);
     }
-
+    
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetItem(Guid id, CancellationToken cancellationToken)
     {
@@ -50,6 +37,19 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
         {
             throw new NotFoundException(nameof(Item), id);
         }
+
+        return Ok(item.ToItemDetailsResponse());
+    }
+    
+    [HttpPost]
+    [Validate(typeof(CreateItemRequest))]
+    public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest request,
+        CancellationToken cancellationToken)
+    {
+        var item = request.ToItem();
+
+        dbContext.Items.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         return Ok(item.ToItemDetailsResponse());
     }
@@ -75,24 +75,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
 
         return NoContent();
     }
-
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> DeleteItem(Guid id, CancellationToken cancellationToken)
-    {
-        var item = await dbContext.Items.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-
-        if (item is null)
-        {
-            throw new NotFoundException(nameof(Item), id);
-        }
-
-        dbContext.Items.Remove(item);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        return NoContent();
-    }
-
+    
     [HttpPut("{id:guid}/complete")]
     public async Task<IActionResult> CompleteItem(Guid id, CancellationToken cancellationToken)
     {
@@ -108,6 +91,23 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
 
         await dbContext.SaveChangesAsync(cancellationToken);
         
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.Items.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            throw new NotFoundException(nameof(Item), id);
+        }
+
+        dbContext.Items.Remove(item);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         return NoContent();
     }
 }
