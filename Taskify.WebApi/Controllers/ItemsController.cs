@@ -20,12 +20,14 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
     {
         var items = await dbContext.Items
             .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAtUtc)
             .Select(ItemProjections.ToItemResponse)
             .ToListAsync(cancellationToken);
 
+
         return Ok(items);
     }
-    
+
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetItem(Guid id, CancellationToken cancellationToken)
     {
@@ -40,7 +42,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
 
         return Ok(item.ToItemDetailsResponse());
     }
-    
+
     [HttpPost]
     [Validate(typeof(CreateItemRequest))]
     public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest request,
@@ -75,7 +77,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
 
         return NoContent();
     }
-    
+
     [HttpPut("{id:guid}/complete")]
     public async Task<IActionResult> CompleteItem(Guid id, CancellationToken cancellationToken)
     {
@@ -90,7 +92,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
         item.CompletedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
 
         await dbContext.SaveChangesAsync(cancellationToken);
-        
+
         return NoContent();
     }
 
