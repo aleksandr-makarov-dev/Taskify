@@ -3,9 +3,9 @@ using Taskify.WebApi.Contracts.Requests;
 
 namespace Taskify.WebApi.Contracts.Validators;
 
-public sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
+public sealed class UpdateItemValidator : AbstractValidator<CreateItemRequest>
 {
-    public CreateItemValidator()
+    public UpdateItemValidator()
     {
         RuleFor(x => x.Name)
             .NotEmpty()
