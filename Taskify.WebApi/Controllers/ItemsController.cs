@@ -13,7 +13,7 @@ namespace Taskify.WebApi.Controllers;
 [ApiController]
 [ApiVersion(1.0)]
 [Route("api/v{version:apiVersion}/items")]
-public class ItemsController(ApplicationDbContext dbContext) : ControllerBase
+public class ItemsController(ApplicationDbContext dbContext, TimeProvider timeProvider) : ControllerBase
 {
     [HttpPost]
     [Validate(typeof(CreateItemRequest))]
@@ -90,6 +90,24 @@ public class ItemsController(ApplicationDbContext dbContext) : ControllerBase
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
+        return NoContent();
+    }
+
+    [HttpPut("{id:guid}/complete")]
+    public async Task<IActionResult> CompleteItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.Items.FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+        if (item is null)
+        {
+            throw new NotFoundException(nameof(Item), id);
+        }
+
+        item.IsComplete = true;
+        item.CompletedAtUtc = timeProvider.GetUtcNow().UtcDateTime;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        
         return NoContent();
     }
 }
