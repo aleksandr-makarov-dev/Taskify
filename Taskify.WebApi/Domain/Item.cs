@@ -5,7 +5,7 @@ public sealed class Item : Entity, IAuditable, ISoftDeletable
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public Priority Priority { get; set; }
-    public DateTime? DueDateAtUtc { get; set; }
+    public DateTime? DueDateOnUtc { get; set; }
 
     public bool IsComplete { get; set; }
     public DateTime? CompletedAtUtc { get; set; }

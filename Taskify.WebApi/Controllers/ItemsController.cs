@@ -1,29 +1,26 @@
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
-using Taskify.WebApi.Contracts;
+using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Infrastructure.Filters;
+using Taskify.WebApi.Mapping;
+using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Controllers;
 
 [ApiController]
 [ApiVersion(1.0)]
 [Route("api/v{version:apiVersion}/items")]
-public class ItemsController : ControllerBase
+public class ItemsController(ApplicationDbContext dbContext) : ControllerBase
 {
     [HttpPost]
     [Validate<CreateItemRequest>]
-    public IActionResult Post([FromBody] CreateItemRequest item, CancellationToken cancellationToken)
+    public async Task<IActionResult> Post([FromBody] CreateItemRequest request, CancellationToken cancellationToken)
     {
-        var response = new ItemResponse(
-            Guid.NewGuid(),
-            item.Name,
-            item.Description,
-            item.Priority,
-            item.DueDateAtUtc,
-            DateTime.UtcNow,
-            null
-        );
+        var item = request.ToItem();
 
-        return Ok(response);
+        dbContext.Items.Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return Ok(item.ToItemResponse());
     }
 }

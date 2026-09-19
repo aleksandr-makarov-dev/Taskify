@@ -1,6 +1,7 @@
 using FluentValidation;
+using Taskify.WebApi.Contracts.Requests;
 
-namespace Taskify.WebApi.Contracts;
+namespace Taskify.WebApi.Validators;
 
 internal sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
 {
@@ -16,7 +17,7 @@ internal sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
         RuleFor(x => x.Priority)
             .IsInEnum();
 
-        RuleFor(x => x.DueDateAtUtc)
+        RuleFor(x => x.DueDateOnUtc)
             .Must(x => x is null || x > DateTime.UtcNow)
             .WithMessage("Due date must be in the future.");
     }
