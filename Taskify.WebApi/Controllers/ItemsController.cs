@@ -5,7 +5,7 @@ using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Domain;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
-using Taskify.WebApi.Mapping;
+using Taskify.WebApi.Mappings;
 using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Controllers;

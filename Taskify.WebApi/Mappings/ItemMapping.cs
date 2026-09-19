@@ -2,7 +2,7 @@ using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Contracts.Responses;
 using Taskify.WebApi.Domain;
 
-namespace Taskify.WebApi.Mapping;
+namespace Taskify.WebApi.Mappings;
 
 public static class ItemMapping
 {
