@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -6,6 +7,7 @@ using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Domain.Users;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
+using Taskify.WebApi.Persistence;
 using Taskify.WebApi.Services;
 using UnauthorizedAccessException = Taskify.WebApi.Infrastructure.Exceptions.UnauthorizedAccessException;
 
@@ -19,7 +21,9 @@ public class UsersController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
     ILogger<UsersController> logger,
-    IJsonWebTokenService jsonWebTokenService) : ControllerBase
+    IJsonWebTokenService jsonWebTokenService,
+    TimeProvider timeProvider,
+    ApplicationDbContext dbContext) : ControllerBase
 {
     [HttpPost("register")]
     [Validate(typeof(RegisterUserRequest))]
@@ -95,9 +99,25 @@ public class UsersController(
 
         var userRoles = await userManager.GetRolesAsync(existingUser);
 
+        var refreshTokenAsBytes = RandomNumberGenerator.GetBytes(64);
+        var refreshTokenAsString = Convert.ToBase64String(refreshTokenAsBytes);
+
+        var refreshToken = new RefreshToken
+        {
+            UserId = existingUser.Id,
+            TokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenAsBytes)),
+            GroupId = Guid.NewGuid(),
+            ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime.AddDays(7),
+            IsRevoked = false
+        };
+
+        dbContext.RefreshTokens.Add(refreshToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
         var accessToken = jsonWebTokenService.CreateToken(existingUser, userRoles);
 
-        return Ok(new { AccessToken = accessToken });
+        return Ok(new { AccessToken = accessToken, RefreshToken = refreshTokenAsString });
     }
 
     [HttpPost("verify-email")]
