@@ -30,8 +30,9 @@ public static class ServiceCollectionExtensions
     public static void AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        
+
         services.AddHostedService<ItemExpirationBackgroundService>();
+        services.AddHostedService<SoftDeleteBackgroundService>();
 
         services.AddValidation();
 
