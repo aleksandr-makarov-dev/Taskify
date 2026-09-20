@@ -16,7 +16,7 @@ namespace Taskify.WebApi.Tests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
-    public FakeTimeProvider TimeProvider { get; } = new(new DateTimeOffset(2026, 9, 20, 0, 0, 0, TimeSpan.Zero));
+    public FakeTimeProvider TimeProvider { get; } = new();
 
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("taskify")
