@@ -1,21 +1,25 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Domain.Users;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
+using Taskify.WebApi.Services;
 using UnauthorizedAccessException = Taskify.WebApi.Infrastructure.Exceptions.UnauthorizedAccessException;
 
 namespace Taskify.WebApi.Controllers;
 
+[AllowAnonymous]
 [ApiController]
 [ApiVersion(1.0)]
 [Route("api/v{version:apiVersion}/users")]
 public class UsersController(
     UserManager<User> userManager,
     SignInManager<User> signInManager,
-    ILogger<UsersController> logger) : ControllerBase
+    ILogger<UsersController> logger,
+    IJsonWebTokenService jsonWebTokenService) : ControllerBase
 {
     [HttpPost("register")]
     [Validate(typeof(RegisterUserRequest))]
@@ -89,9 +93,11 @@ public class UsersController(
             throw new UnauthorizedAccessException("Invalid email or password.");
         }
 
-        // TODO: generate refresh + access token pair
+        var userRoles = await userManager.GetRolesAsync(existingUser);
 
-        return Ok();
+        var accessToken = jsonWebTokenService.CreateToken(existingUser, userRoles);
+
+        return Ok(new { AccessToken = accessToken });
     }
 
     [HttpPost("verify-email")]

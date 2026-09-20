@@ -1,9 +1,10 @@
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Taskify.WebApi.Contracts.Requests;
-using Taskify.WebApi.Domain;
 using Taskify.WebApi.Domain.Items;
+using Taskify.WebApi.Domain.Users;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
 using Taskify.WebApi.Mappings;
@@ -11,6 +12,7 @@ using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Controllers;
 
+[Authorize(Roles = RoleNames.User)]
 [ApiController]
 [ApiVersion(1.0)]
 [Route("api/v{version:apiVersion}/items")]
