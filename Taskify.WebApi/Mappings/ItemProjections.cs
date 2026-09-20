@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using Taskify.WebApi.Contracts.Responses;
-using Taskify.WebApi.Domain;
 using Taskify.WebApi.Domain.Items;
 
 namespace Taskify.WebApi.Mappings;

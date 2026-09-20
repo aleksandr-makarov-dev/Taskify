@@ -1,4 +1,3 @@
-using Taskify.WebApi.Domain;
 using Taskify.WebApi.Domain.Items;
 
 namespace Taskify.WebApi.Contracts.Requests;
