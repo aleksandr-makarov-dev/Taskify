@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
-using Taskify.WebApi.Domain;
+using Taskify.WebApi.Domain.Items;
 
 namespace Taskify.WebApi.Tests.BackgroundServices;
 

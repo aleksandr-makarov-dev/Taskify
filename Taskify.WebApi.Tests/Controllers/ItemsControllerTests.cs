@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Shouldly;
 using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Contracts.Responses;
-using Taskify.WebApi.Domain;
+using Taskify.WebApi.Domain.Items;
 using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Tests.Controllers;
