@@ -15,7 +15,7 @@ public sealed class ItemExpirationBackgroundService(
     {
         logger.LogInformation("Expiration checker started. Interval: {Interval}", CheckInterval);
 
-        using var timer = new PeriodicTimer(CheckInterval);
+        using var timer = new PeriodicTimer(CheckInterval, timeProvider);
 
         try
         {
@@ -28,6 +28,11 @@ public sealed class ItemExpirationBackgroundService(
         {
             logger.LogInformation("Expiration checker stopped.");
         }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Item expiration background service failed unexpectedly.");
+            throw;
+        }
     }
 
     private async Task CheckExpiredItemsAsync(CancellationToken cancellationToken)
@@ -38,8 +43,6 @@ public sealed class ItemExpirationBackgroundService(
             .GetRequiredService<ApplicationDbContext>();
 
         var utcNow = timeProvider.GetUtcNow().UtcDateTime;
-
-        logger.LogDebug("Checking for expired items at {UtcNow}.", utcNow);
 
         var count = await dbContext.Items
             .Where(x =>
@@ -56,6 +59,9 @@ public sealed class ItemExpirationBackgroundService(
                     .SetProperty(x => x.ExpiredAtUtc, utcNow);
             }, cancellationToken);
 
-        logger.LogInformation("Marked {Count} items as expired at {UtcNow}.", count, utcNow);
+        if (count > 0)
+        {
+            logger.LogInformation("Marked {Count} items as expired at {UtcNow}.", count, utcNow);
+        }
     }
 }
