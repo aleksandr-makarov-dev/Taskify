@@ -23,7 +23,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(ItemProjections.ToItemResponse)
             .ToListAsync(cancellationToken);
-        
+
         return Ok(items);
     }
 
@@ -110,5 +110,37 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return NoContent();
+    }
+
+    [HttpPost("{id:guid}/restore")]
+    public async Task<IActionResult> RestoreItem(Guid id, CancellationToken cancellationToken)
+    {
+        var item = await dbContext.Items
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
+            .FirstOrDefaultAsync(x => x.Id == id && x.IsDeleted, cancellationToken);
+
+        if (item is null)
+        {
+            throw new NotFoundException(nameof(Item), id);
+        }
+
+        item.IsDeleted = false;
+        item.DeletedAtUtc = null;
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return NoContent();
+    }
+
+    [HttpGet("trash")]
+    public async Task<IActionResult> GetTrashItems(CancellationToken cancellationToken)
+    {
+        var items = await dbContext.Items
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
+            .Where(x => x.IsDeleted)
+            .OrderByDescending(x => x.DeletedAtUtc)
+            .Select(ItemProjections.ToItemResponse)
+            .ToListAsync(cancellationToken);
+
+        return Ok(items);
     }
 }
