@@ -1,9 +1,12 @@
 using System.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Time.Testing;
 using Respawn;
 using Respawn.Graph;
 using Taskify.WebApi.Persistence;
@@ -13,6 +16,8 @@ namespace Taskify.WebApi.Tests;
 
 public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
+    public FakeTimeProvider TimeProvider { get; } = new(new DateTimeOffset(2026, 9, 20, 0, 0, 0, TimeSpan.Zero));
+
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:17-alpine")
         .WithDatabase("taskify")
         .WithUsername("postgres")
@@ -38,6 +43,12 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>, IAsyncL
     {
         base.ConfigureWebHost(builder);
         builder.UseSetting("ConnectionStrings:DefaultConnection", _postgres.GetConnectionString());
+
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(TimeProvider);
+        });
     }
 
     protected override IHost CreateHost(IHostBuilder builder)

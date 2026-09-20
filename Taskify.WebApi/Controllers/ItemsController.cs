@@ -23,8 +23,7 @@ public class ItemsController(ApplicationDbContext dbContext, TimeProvider timePr
             .OrderByDescending(x => x.CreatedAtUtc)
             .Select(ItemProjections.ToItemResponse)
             .ToListAsync(cancellationToken);
-
-
+        
         return Ok(items);
     }
 

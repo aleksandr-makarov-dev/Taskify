@@ -5,6 +5,7 @@ using Shouldly;
 using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Contracts.Responses;
 using Taskify.WebApi.Domain;
+using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Tests.Controllers;
 
@@ -29,7 +30,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name_1",
             Description = "Test_Description_1",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         var secondRequest = new CreateItemRequest
@@ -56,12 +57,12 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
         items.ShouldNotBeNull();
         items.Count.ShouldBe(2);
 
-        var firstItem = items[1];
+        var firstItem = items[0];
         firstItem.Name.ShouldBe(firstRequest.Name);
         firstItem.Priority.ShouldBe(firstRequest.Priority);
         // firstItem.DueDateOnUtc.ShouldBe(firstRequest.DueDateOnUtc);
 
-        var secondItem = items[0];
+        var secondItem = items[1];
         secondItem.Name.ShouldBe(secondRequest.Name);
         secondItem.Priority.ShouldBe(secondRequest.Priority);
         // secondItem.DueDateOnUtc.ShouldBe(secondRequest.DueDateOnUtc);
@@ -76,7 +77,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         var createResponse =
@@ -113,7 +114,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         // Act
@@ -142,7 +143,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         var createResponse =
@@ -194,7 +195,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         var createResponse =
@@ -233,7 +234,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = DateTime.UtcNow.AddDays(1)
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
         var createResponse =
@@ -261,6 +262,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
 
         var deletedItem = await factory.ExecuteDbContextAsync(dbContext =>
             dbContext.Items
+                .IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.Id == itemId, CancellationToken.None));
 

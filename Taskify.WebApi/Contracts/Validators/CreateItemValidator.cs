@@ -5,7 +5,7 @@ namespace Taskify.WebApi.Contracts.Validators;
 
 public sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
 {
-    public CreateItemValidator()
+    public CreateItemValidator(TimeProvider timeProvider)
     {
         RuleFor(x => x.Name)
             .NotEmpty()
@@ -18,7 +18,7 @@ public sealed class CreateItemValidator : AbstractValidator<CreateItemRequest>
             .IsInEnum();
 
         RuleFor(x => x.DueDateOnUtc)
-            .Must(x => x is null || x > DateTime.UtcNow)
+            .Must(x => x is null || x > timeProvider.GetUtcNow().UtcDateTime)
             .WithMessage("Due date must be in the future.");
     }
 }
