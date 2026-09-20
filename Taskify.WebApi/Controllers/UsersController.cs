@@ -45,8 +45,11 @@ public class UsersController(
         }
 
         await userManager.AddToRoleAsync(user, RoleNames.User);
-        
+
         // TODO: send email confirmation letter
+        var emailConfirmationToken = await userManager.GenerateEmailConfirmationTokenAsync(user);
+
+        logger.LogInformation("Email confirmation token: {EmailConfirmationToken}", emailConfirmationToken);
 
         return Ok();
     }
@@ -85,8 +88,36 @@ public class UsersController(
 
             throw new UnauthorizedAccessException("Invalid email or password.");
         }
-        
+
         // TODO: generate refresh + access token pair
+
+        return Ok();
+    }
+
+    [HttpPost("verify-email")]
+    [Validate(typeof(VerifyEmailRequest))]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existingUser = await userManager.FindByEmailAsync(request.Email);
+
+        if (existingUser is null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        if (await userManager.IsEmailConfirmedAsync(existingUser))
+        {
+            return Ok();
+        }
+
+        var confirmEmailResult = await userManager.ConfirmEmailAsync(existingUser, request.Token);
+
+        if (!confirmEmailResult.Succeeded)
+        {
+            var error = confirmEmailResult.Errors.FirstOrDefault();
+            throw new UnauthorizedAccessException(error?.Description ?? "Failed to confirm email.");
+        }
 
         return Ok();
     }
