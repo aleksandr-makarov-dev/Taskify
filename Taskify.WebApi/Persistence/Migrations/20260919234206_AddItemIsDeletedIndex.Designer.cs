@@ -9,7 +9,7 @@ using Taskify.WebApi.Persistence;
 
 #nullable disable
 
-namespace Taskify.WebApi.Migrations
+namespace Taskify.WebApi.Persistence.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
     [Migration("20260919234206_AddItemIsDeletedIndex")]

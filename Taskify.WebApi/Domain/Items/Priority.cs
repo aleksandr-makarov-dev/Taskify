@@ -1,4 +1,4 @@
-namespace Taskify.WebApi.Domain;
+namespace Taskify.WebApi.Domain.Items;
 
 public enum Priority
 {

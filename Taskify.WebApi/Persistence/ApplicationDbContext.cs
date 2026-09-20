@@ -1,9 +1,12 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Taskify.WebApi.Domain;
+using Taskify.WebApi.Domain.Items;
+using Taskify.WebApi.Domain.Users;
 
 namespace Taskify.WebApi.Persistence;
 
-public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
+public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    : IdentityDbContext<User, Role, Guid>(options)
 {
     public DbSet<Item> Items { get; set; }
 

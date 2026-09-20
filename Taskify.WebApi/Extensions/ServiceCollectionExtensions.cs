@@ -1,6 +1,8 @@
 using Asp.Versioning;
 using FluentValidation;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Taskify.WebApi.Domain.Users;
 using Taskify.WebApi.Infrastructure.BackgroundServices;
 using Taskify.WebApi.Infrastructure.Filters;
 using Taskify.WebApi.Infrastructure.Middlewares;
@@ -27,9 +29,33 @@ public static class ServiceCollectionExtensions
         });
     }
 
+    public static void AddIdentity(this IServiceCollection services)
+    {
+        services.AddIdentityCore<User>(options =>
+            {
+                options.Password.RequiredLength = 6;
+                options.Password.RequireDigit = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireNonAlphanumeric = false;
+
+                options.SignIn.RequireConfirmedEmail = true;
+
+                options.Lockout.AllowedForNewUsers = true;
+                options.Lockout.MaxFailedAccessAttempts = 5;
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
+            })
+            .AddRoles<Role>()
+            .AddSignInManager()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+    }
+
     public static void AddInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
+
+        services.AddDataProtection();
 
         services.AddHostedService<ItemExpirationBackgroundService>();
         services.AddHostedService<SoftDeleteBackgroundService>();

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Domain;
+using Taskify.WebApi.Domain.Items;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
 using Taskify.WebApi.Mappings;

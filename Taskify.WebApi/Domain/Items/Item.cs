@@ -1,4 +1,4 @@
-namespace Taskify.WebApi.Domain;
+namespace Taskify.WebApi.Domain.Items;
 
 public sealed class Item : Entity, IAuditable, ISoftDeletable
 {

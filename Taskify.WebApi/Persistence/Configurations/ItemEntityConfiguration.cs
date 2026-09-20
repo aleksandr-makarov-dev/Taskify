@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Taskify.WebApi.Domain;
+using Taskify.WebApi.Domain.Items;
 
 namespace Taskify.WebApi.Persistence.Configurations;
 

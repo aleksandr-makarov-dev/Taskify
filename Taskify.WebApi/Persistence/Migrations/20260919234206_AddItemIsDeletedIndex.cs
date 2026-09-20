@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace Taskify.WebApi.Migrations
+namespace Taskify.WebApi.Persistence.Migrations
 {
     /// <inheritdoc />
     public partial class AddItemIsDeletedIndex : Migration
