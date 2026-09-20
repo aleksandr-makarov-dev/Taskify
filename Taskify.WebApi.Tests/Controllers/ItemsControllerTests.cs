@@ -21,11 +21,13 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
-    [Fact(DisplayName = "Getting all items returns 200 OK with all items")]
-    public async Task GetItems_ReturnsAllItems()
+    #region GET /api/v1/items
+
+    [Fact(DisplayName = "Getting all items returns 200 OK with non-deleted items")]
+    public async Task GetItems_ReturnsAllActiveItems()
     {
         // Arrange
-        var firstRequest = new CreateItemRequest
+        var firstItem = new Item
         {
             Name = "Test_Name_1",
             Description = "Test_Description_1",
@@ -33,7 +35,7 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
-        var secondRequest = new CreateItemRequest
+        var secondItem = new Item
         {
             Name = "Test_Name_2",
             Description = null,
@@ -41,9 +43,19 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             DueDateOnUtc = null
         };
 
-        await _httpClient.PostAsJsonAsync("/api/v1/items", firstRequest, TestContext.Current.CancellationToken);
+        var softDeletedItem = new Item
+        {
+            Name = "SoftDeleted_Name",
+            Priority = Priority.Medium,
+            IsDeleted = true,
+            DeletedAtUtc = factory.TimeProvider.GetUtcNow().UtcDateTime
+        };
 
-        await _httpClient.PostAsJsonAsync("/api/v1/items", secondRequest, TestContext.Current.CancellationToken);
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.AddRange([firstItem, secondItem, softDeletedItem]);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
 
         // Act
         var response = await _httpClient.GetAsync("/api/v1/items", TestContext.Current.CancellationToken);
@@ -51,28 +63,20 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var items =
-            await response.Content.ReadFromJsonAsync<List<ItemResponse>>(TestContext.Current.CancellationToken);
+        var items = await response.Content.ReadFromJsonAsync<List<ItemResponse>>(TestContext.Current.CancellationToken);
 
         items.ShouldNotBeNull();
         items.Count.ShouldBe(2);
-
-        var firstItem = items[0];
-        firstItem.Name.ShouldBe(firstRequest.Name);
-        firstItem.Priority.ShouldBe(firstRequest.Priority);
-        // firstItem.DueDateOnUtc.ShouldBe(firstRequest.DueDateOnUtc);
-
-        var secondItem = items[1];
-        secondItem.Name.ShouldBe(secondRequest.Name);
-        secondItem.Priority.ShouldBe(secondRequest.Priority);
-        // secondItem.DueDateOnUtc.ShouldBe(secondRequest.DueDateOnUtc);
+        items.ShouldContain(x => x.Name == firstItem.Name);
+        items.ShouldContain(x => x.Name == secondItem.Name);
+        items.ShouldNotContain(x => x.Name == softDeletedItem.Name);
     }
 
     [Fact(DisplayName = "Getting an existing item returns 200 OK with item details")]
     public async Task GetItem_ReturnsItemDetails()
     {
         // Arrange
-        var request = new CreateItemRequest
+        var item = new Item
         {
             Name = "Test_Name",
             Description = "Test_Description",
@@ -80,30 +84,30 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
-        var createResponse =
-            await _httpClient.PostAsJsonAsync("/api/v1/items", request, TestContext.Current.CancellationToken);
-
-        var createdItem =
-            await createResponse.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
-
-        createdItem.ShouldNotBeNull();
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(item);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
 
         // Act
-        var response =
-            await _httpClient.GetAsync($"/api/v1/items/{createdItem.Id}", TestContext.Current.CancellationToken);
+        var response = await _httpClient.GetAsync($"/api/v1/items/{item.Id}", TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var item = await response.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
 
-        item.ShouldNotBeNull();
-        item.Id.ShouldBe(createdItem.Id);
-        item.Name.ShouldBe(request.Name);
-        item.Description.ShouldBe(request.Description);
-        item.Priority.ShouldBe(request.Priority);
-        // item.DueDateOnUtc.ShouldBe(request.DueDateOnUtc);
+        result.ShouldNotBeNull();
+        result.Id.ShouldBe(item.Id);
+        result.Name.ShouldBe(item.Name);
+        result.Description.ShouldBe(item.Description);
+        result.Priority.ShouldBe(item.Priority);
     }
+
+    #endregion
+
+    #region POST /api/v1/items
 
     [Fact(DisplayName = "Creating a valid item returns 200 OK with full item details")]
     public async Task CreateItem_ReturnsCreatedItem()
@@ -118,144 +122,136 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
         };
 
         // Act
-        var response =
-            await _httpClient.PostAsJsonAsync("/api/v1/items", request, TestContext.Current.CancellationToken);
+        var response = await _httpClient.PostAsJsonAsync("/api/v1/items", request, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
-        var createdItem =
-            await response.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
+        var createdItem = await response.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
 
         createdItem.ShouldNotBeNull();
         createdItem.Name.ShouldBe(request.Name);
         createdItem.Description.ShouldBe(request.Description);
         createdItem.Priority.ShouldBe(request.Priority);
-        // createdItem.DueDateOnUtc.ShouldBe(request.DueDateOnUtc);
+        
+        var persistedItem = await factory.ExecuteDbContextAsync(dbContext =>
+            dbContext.Items.AsNoTracking().FirstOrDefaultAsync(x => x.Id == createdItem.Id, CancellationToken.None));
+
+        persistedItem.ShouldNotBeNull();
     }
+
+    #endregion
+
+    #region PUT /api/v1/items/{id}
 
     [Fact(DisplayName = "Updating a valid item returns 204 NoContent")]
     public async Task UpdateItem_Returns204NoContent()
     {
         // Arrange
-        var request = new CreateItemRequest
+        var existingItem = new Item
         {
-            Name = "Test_Name",
-            Description = "Test_Description",
+            Name = "Original_Name",
+            Description = "Original_Description",
             Priority = Priority.Low,
             DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
         };
 
-        var createResponse =
-            await _httpClient.PostAsJsonAsync("/api/v1/items", request, TestContext.Current.CancellationToken);
-
-        var createdItem =
-            await createResponse.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
-
-        createdItem.ShouldNotBeNull();
-
-        var dueDateOnUtc = DateTime.UtcNow.AddMinutes(5);
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(existingItem);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
 
         var updateRequest = new UpdateItemRequest
         {
             Name = "Test_Name_Updated",
             Description = "Test_Description_Updated",
             Priority = Priority.Medium,
-            DueDateOnUtc = dueDateOnUtc
+            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddMinutes(5)
         };
 
         // Act
-
-        var itemId = createdItem.Id;
-
-        var result =
-            await _httpClient.PutAsJsonAsync($"/api/v1/items/{itemId}", updateRequest,
-                TestContext.Current.CancellationToken);
+        var response = await _httpClient.PutAsJsonAsync(
+            $"/api/v1/items/{existingItem.Id}",
+            updateRequest,
+            TestContext.Current.CancellationToken);
 
         // Assert
-        result.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var updatedItem = await factory.ExecuteDbContextAsync(dbContext =>
-            dbContext.Items.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == itemId, CancellationToken.None));
+            dbContext.Items.AsNoTracking().FirstOrDefaultAsync(x => x.Id == existingItem.Id, CancellationToken.None));
 
         updatedItem.ShouldNotBeNull();
         updatedItem.Name.ShouldBe(updateRequest.Name);
         updatedItem.Description.ShouldBe(updateRequest.Description);
         updatedItem.Priority.ShouldBe(updateRequest.Priority);
-        // updatedItem.DueDateOnUtc.ShouldBe(updateRequest.DueDateOnUtc);
     }
+
+    #endregion
+
+    #region PUT /api/v1/items/{id}/complete
 
     [Fact(DisplayName = "Completing an existing item returns 204 NoContent and marks item as complete")]
     public async Task CompleteItem_Returns204NoContent()
     {
         // Arrange
-        var request = new CreateItemRequest
+        var existingItem = new Item
         {
             Name = "Test_Name",
             Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
+            IsComplete = false
         };
 
-        var createResponse =
-            await _httpClient.PostAsJsonAsync("/api/v1/items", request, TestContext.Current.CancellationToken);
-
-        var createdItem =
-            await createResponse.Content.ReadFromJsonAsync<ItemDetailsResponse>(TestContext.Current.CancellationToken);
-
-        createdItem.ShouldNotBeNull();
-
-        var itemId = createdItem.Id;
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(existingItem);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
 
         // Act
-        var response = await _httpClient.PutAsync($"/api/v1/items/{itemId}/complete", null,
+        var response = await _httpClient.PutAsync(
+            $"/api/v1/items/{existingItem.Id}/complete",
+            null,
             TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
 
         var completedItem = await factory.ExecuteDbContextAsync(dbContext =>
-            dbContext.Items
-                .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == itemId, CancellationToken.None));
+            dbContext.Items.AsNoTracking().FirstOrDefaultAsync(x => x.Id == existingItem.Id, CancellationToken.None));
 
         completedItem.ShouldNotBeNull();
         completedItem.IsComplete.ShouldBeTrue();
         completedItem.CompletedAtUtc.ShouldNotBeNull();
     }
 
-    [Fact(DisplayName = "Deleting an existing item returns 204 NoContent and removes the item")]
+    #endregion
+
+    #region DELETE /api/v1/items/{id}
+
+    [Fact(DisplayName = "Deleting an existing item returns 204 NoContent and soft-deletes the item")]
     public async Task DeleteItem_Returns204NoContent()
     {
         // Arrange
-        var request = new CreateItemRequest
+        var existingItem = new Item
         {
             Name = "Test_Name",
-            Description = "Test_Description",
             Priority = Priority.Low,
-            DueDateOnUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddHours(1)
+            IsDeleted = false
         };
 
-        var createResponse =
-            await _httpClient.PostAsJsonAsync(
-                "/api/v1/items",
-                request,
-                TestContext.Current.CancellationToken);
-
-        var createdItem =
-            await createResponse.Content.ReadFromJsonAsync<ItemDetailsResponse>(
-                TestContext.Current.CancellationToken);
-
-        createdItem.ShouldNotBeNull();
-
-        var itemId = createdItem.Id;
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(existingItem);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
 
         // Act
-        var response =
-            await _httpClient.DeleteAsync(
-                $"/api/v1/items/{itemId}",
-                TestContext.Current.CancellationToken);
+        var response = await _httpClient.DeleteAsync(
+            $"/api/v1/items/{existingItem.Id}",
+            TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
@@ -264,10 +260,141 @@ public class ItemsControllerTests(TestWebApplicationFactory factory) : IAsyncLif
             dbContext.Items
                 .IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == itemId, CancellationToken.None));
+                .FirstOrDefaultAsync(x => x.Id == existingItem.Id, CancellationToken.None));
 
         deletedItem.ShouldNotBeNull();
         deletedItem.IsDeleted.ShouldBeTrue();
         deletedItem.DeletedAtUtc.ShouldNotBeNull();
     }
+
+    #endregion
+
+    #region POST /api/v1/items/{id}/restore
+
+    [Fact(DisplayName = "Restoring a soft-deleted item returns 204 NoContent and unmarks soft-delete")]
+    public async Task RestoreItem_WhenItemIsSoftDeleted_Returns204NoContentAndRestoresItem()
+    {
+        // Arrange
+        var softDeletedItem = new Item
+        {
+            Name = "Deleted_Item",
+            Priority = Priority.Low,
+            IsDeleted = true,
+            DeletedAtUtc = factory.TimeProvider.GetUtcNow().UtcDateTime.AddMinutes(-10)
+        };
+
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(softDeletedItem);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
+
+        // Act
+        var response = await _httpClient.PostAsync(
+            $"/api/v1/items/{softDeletedItem.Id}/restore",
+            null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.NoContent);
+
+        var restoredItem = await factory.ExecuteDbContextAsync(dbContext =>
+            dbContext.Items
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == softDeletedItem.Id, CancellationToken.None));
+
+        restoredItem.ShouldNotBeNull();
+        restoredItem.IsDeleted.ShouldBeFalse();
+        restoredItem.DeletedAtUtc.ShouldBeNull();
+    }
+
+    [Fact(DisplayName = "Restoring an active or non-existent item returns 404 NotFound")]
+    public async Task RestoreItem_WhenItemIsNotSoftDeletedOrDoesNotExist_Returns404NotFound()
+    {
+        // Arrange
+        var activeItem = new Item
+        {
+            Name = "Active_Item",
+            Priority = Priority.Low,
+            IsDeleted = false
+        };
+
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.Add(activeItem);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
+        
+        var responseForActive = await _httpClient.PostAsync(
+            $"/api/v1/items/{activeItem.Id}/restore",
+            null,
+            TestContext.Current.CancellationToken);
+        
+        var responseForNonExistent = await _httpClient.PostAsync(
+            $"/api/v1/items/{Guid.NewGuid()}/restore",
+            null,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        responseForActive.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+        responseForNonExistent.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+    }
+
+    #endregion
+
+    #region GET /api/v1/items/trash
+
+    [Fact(DisplayName = "Getting trash items returns 200 OK with only soft-deleted items sorted descending by DeletedAtUtc")]
+    public async Task GetTrashItems_ReturnsSoftDeletedItemsOrderedByDeletedAtUtcDescending()
+    {
+        // Arrange
+        var baseUtc = factory.TimeProvider.GetUtcNow().UtcDateTime;
+
+        var olderDeletedItem = new Item
+        {
+            Name = "Older_Deleted_Item",
+            Priority = Priority.Low,
+            IsDeleted = true,
+            DeletedAtUtc = baseUtc.AddMinutes(-20)
+        };
+
+        var newerDeletedItem = new Item
+        {
+            Name = "Newer_Deleted_Item",
+            Priority = Priority.High,
+            IsDeleted = true,
+            DeletedAtUtc = baseUtc.AddMinutes(-5)
+        };
+
+        var activeItem = new Item
+        {
+            Name = "Active_Item",
+            Priority = Priority.Medium,
+            IsDeleted = false
+        };
+
+        await factory.ExecuteDbContextAsync(async dbContext =>
+        {
+            dbContext.Items.AddRange([olderDeletedItem, newerDeletedItem, activeItem]);
+            await dbContext.SaveChangesAsync(TestContext.Current.CancellationToken);
+        });
+
+        // Act
+        var response = await _httpClient.GetAsync("/api/v1/items/trash", TestContext.Current.CancellationToken);
+
+        // Assert
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var trashItems = await response.Content.ReadFromJsonAsync<List<ItemResponse>>(TestContext.Current.CancellationToken);
+
+        trashItems.ShouldNotBeNull();
+        trashItems.Count.ShouldBe(2);
+        
+        trashItems[0].Name.ShouldBe(newerDeletedItem.Name);
+        trashItems[1].Name.ShouldBe(olderDeletedItem.Name);
+        
+        trashItems.ShouldNotContain(x => x.Name == activeItem.Name);
+    }
+
+    #endregion
 }
