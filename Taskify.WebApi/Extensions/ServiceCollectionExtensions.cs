@@ -92,6 +92,12 @@ public static class ServiceCollectionExtensions
             {
                 options.ClientId = externalProvidersOptions.Google.ClientId;
                 options.ClientSecret = externalProvidersOptions.Google.ClientSecret;
+            })
+            .AddGitHub(options =>
+            {
+                options.ClientId = externalProvidersOptions.Github.ClientId;
+                options.ClientSecret = externalProvidersOptions.Github.ClientSecret;
+                options.Scope.Add("user:email");
             });
 
         services.AddAuthorization();

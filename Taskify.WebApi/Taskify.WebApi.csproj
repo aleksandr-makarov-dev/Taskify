@@ -10,6 +10,7 @@
 
     <ItemGroup>
       <PackageReference Include="Asp.Versioning.Mvc.ApiExplorer" Version="10.2.1" />
+      <PackageReference Include="AspNet.Security.OAuth.GitHub" Version="10.0.0" />
       <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.Google" Version="10.0.12" />
       <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />

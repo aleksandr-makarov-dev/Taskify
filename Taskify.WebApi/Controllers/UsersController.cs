@@ -393,7 +393,7 @@ public class UsersController(
         }
 
         var properties = signInManager.ConfigureExternalAuthenticationProperties(provider,
-            $"api/v1.0/users/login/external/callback");
+            $"api/v1/users/login/external/callback");
 
         return Challenge(properties, provider);
     }
