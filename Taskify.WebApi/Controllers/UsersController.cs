@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Security.Cryptography;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -377,5 +378,139 @@ public class UsersController(
             refreshToken.GroupId);
 
         return Ok(new { AccessToken = newAccessToken });
+    }
+
+    [HttpGet("login/external/{provider}")]
+    public async Task<IActionResult> LoginUserByExternalProvider(string provider, CancellationToken cancellationToken)
+    {
+        var externalProviders = await signInManager.GetExternalAuthenticationSchemesAsync();
+
+        var externalProviderNames = externalProviders.Select(x => x.Name);
+
+        if (!externalProviderNames.Contains(provider))
+        {
+            throw new UnauthorizedAccessException("Provider is not supported.");
+        }
+
+        var properties = signInManager.ConfigureExternalAuthenticationProperties(provider,
+            $"api/v1.0/users/login/external/callback");
+
+        return Challenge(properties, provider);
+    }
+
+    [HttpGet("login/external/callback")]
+    public async Task<IActionResult> LoginUserByExternalCallback(CancellationToken cancellationToken)
+    {
+        var externalLoginInfo = await signInManager.GetExternalLoginInfoAsync();
+
+        if (externalLoginInfo is null)
+        {
+            logger.LogWarning("External login callback received without external login information.");
+
+            throw new UnauthorizedAccessException("No external login info found.");
+        }
+
+        var provider = externalLoginInfo.LoginProvider;
+        var providerKey = externalLoginInfo.ProviderKey;
+
+        var email = externalLoginInfo.Principal.FindFirstValue(ClaimTypes.Email);
+
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            logger.LogWarning("External login callback for provider {Provider} did not contain an email claim.",
+                provider);
+
+            throw new UnauthorizedAccessException("No email claim found.");
+        }
+
+        var externalLoginUser = await userManager.FindByLoginAsync(provider, providerKey);
+
+        var existingUser = externalLoginUser ?? await userManager.FindByEmailAsync(email);
+
+        if (existingUser is null)
+        {
+            logger.LogInformation("No existing user found for external provider {Provider}. Creating a new user.",
+                provider);
+
+            existingUser = new User
+            {
+                UserName = email,
+                Email = email,
+                EmailConfirmed = true
+            };
+
+            var createUserResult = await userManager.CreateAsync(existingUser);
+
+            if (!createUserResult.Succeeded)
+            {
+                logger.LogError(
+                    "Failed to create a user during external login for provider {Provider}. Errors: {Errors}",
+                    provider,
+                    string.Join("; ", createUserResult.Errors.Select(error => error.Description)));
+
+                throw new BadRequestException("Failed to create user.");
+            }
+
+            var addToRoleResult = await userManager.AddToRoleAsync(existingUser, RoleNames.User);
+
+            if (!addToRoleResult.Succeeded)
+            {
+                logger.LogError(
+                    "Failed to assign role {RoleName} to a newly created user for provider {Provider}. Errors: {Errors}",
+                    RoleNames.User,
+                    provider,
+                    string.Join("; ", addToRoleResult.Errors.Select(error => error.Description)));
+
+                throw new BadRequestException("Failed to assign user role.");
+            }
+        }
+
+        if (externalLoginUser is null)
+        {
+            logger.LogInformation("Adding external login provider {Provider} to the user.", provider);
+
+            var addLoginResult = await userManager.AddLoginAsync(existingUser, externalLoginInfo);
+
+            if (!addLoginResult.Succeeded)
+            {
+                logger.LogError(
+                    "Failed to add external login provider {Provider} to the user. Errors: {Errors}",
+                    provider,
+                    string.Join("; ", addLoginResult.Errors.Select(error => error.Description)));
+
+                throw new BadRequestException("Failed to add external login.");
+            }
+        }
+
+        var userRoles = await userManager.GetRolesAsync(existingUser);
+
+        var refreshTokenBytes = RandomNumberGenerator.GetBytes(64);
+
+        var refreshToken = new RefreshToken
+        {
+            UserId = existingUser.Id,
+            TokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenBytes)),
+            GroupId = Guid.NewGuid(),
+            ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime.Add(refreshTokenOptions.Value.Expiration),
+            IsRevoked = false
+        };
+
+        dbContext.RefreshTokens.Add(refreshToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var refreshTokenValue = Convert.ToBase64String(refreshTokenBytes);
+
+        var accessToken = jsonWebTokenService.CreateToken(existingUser, userRoles);
+
+        Response.Cookies.Append("refresh_token", refreshTokenValue, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = refreshToken.ExpiresAtUtc
+        });
+
+        return Ok(new { AccessToken = accessToken });
     }
 }

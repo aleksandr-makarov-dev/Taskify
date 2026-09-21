@@ -60,11 +60,16 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IJsonWebTokenService, JsonWebTokenService>();
 
-        var jwtSection = configuration.GetSection(JsonWebTokenOptions.SectionName);
-        var jwtOptions = jwtSection.Get<JsonWebTokenOptions>()
-                         ?? throw new InvalidOperationException("JsonWebTokenOptions is not configured");
+        var jwtOptions = configuration.GetSectionOrThrow<JsonWebTokenOptions>(JsonWebTokenOptions.SectionName);
+        var externalProvidersOptions =
+            configuration.GetSectionOrThrow<ExternalProvidersOptions>(ExternalProvidersOptions.SectionName);
 
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+            })
             .AddJwtBearer(options =>
             {
                 options.MapInboundClaims = false;
@@ -81,6 +86,12 @@ public static class ServiceCollectionExtensions
                         Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
                     ClockSkew = TimeSpan.Zero
                 };
+            })
+            .AddCookie(IdentityConstants.ExternalScheme)
+            .AddGoogle(options =>
+            {
+                options.ClientId = externalProvidersOptions.Google.ClientId;
+                options.ClientSecret = externalProvidersOptions.Google.ClientSecret;
             });
 
         services.AddAuthorization();
