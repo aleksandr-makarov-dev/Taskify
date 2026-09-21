@@ -54,9 +54,9 @@ public sealed class ItemExpirationBackgroundService(
             .Take(options.Value.BatchSize)
             .ExecuteUpdateAsync(setters =>
             {
-                setters
-                    .SetProperty(x => x.IsExpired, true)
-                    .SetProperty(x => x.ExpiredAtUtc, utcNow);
+                setters.SetProperty(x => x.IsExpired, true);
+                setters.SetProperty(x => x.ExpiredAtUtc, utcNow);
+                setters.SetProperty(x => x.LastModifiedAtUtc, utcNow);
             }, cancellationToken);
 
         if (count > 0)

@@ -3,10 +3,13 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Taskify.WebApi.Contracts.Requests;
 using Taskify.WebApi.Domain.Users;
 using Taskify.WebApi.Infrastructure.Exceptions;
 using Taskify.WebApi.Infrastructure.Filters;
+using Taskify.WebApi.Infrastructure.Options;
 using Taskify.WebApi.Persistence;
 using Taskify.WebApi.Services;
 using UnauthorizedAccessException = Taskify.WebApi.Infrastructure.Exceptions.UnauthorizedAccessException;
@@ -23,7 +26,8 @@ public class UsersController(
     ILogger<UsersController> logger,
     IJsonWebTokenService jsonWebTokenService,
     TimeProvider timeProvider,
-    ApplicationDbContext dbContext) : ControllerBase
+    ApplicationDbContext dbContext,
+    IOptions<RefreshTokenOptions> refreshTokenOptions) : ControllerBase
 {
     [HttpPost("register")]
     [Validate(typeof(RegisterUserRequest))]
@@ -107,7 +111,7 @@ public class UsersController(
             UserId = existingUser.Id,
             TokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenAsBytes)),
             GroupId = Guid.NewGuid(),
-            ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime.AddDays(7),
+            ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime.Add(refreshTokenOptions.Value.Expiration),
             IsRevoked = false
         };
 
@@ -117,7 +121,15 @@ public class UsersController(
 
         var accessToken = jsonWebTokenService.CreateToken(existingUser, userRoles);
 
-        return Ok(new { AccessToken = accessToken, RefreshToken = refreshTokenAsString });
+        Response.Cookies.Append("refresh_token", refreshTokenAsString, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = refreshToken.ExpiresAtUtc,
+        });
+
+        return Ok(new { AccessToken = accessToken });
     }
 
     [HttpPost("verify-email")]
@@ -146,5 +158,91 @@ public class UsersController(
         }
 
         return Ok();
+    }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> RefreshToken(CancellationToken cancellationToken)
+    {
+        if (!Request.Cookies.TryGetValue("refresh_token", out var refreshTokenAsString) ||
+            string.IsNullOrEmpty(refreshTokenAsString))
+        {
+            throw new UnauthorizedAccessException("Refresh token cookie not found.");
+        }
+
+        var utcNow = timeProvider.GetUtcNow().UtcDateTime;
+
+        var refreshTokenAsBytes = Convert.FromBase64String(refreshTokenAsString);
+        var tokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenAsBytes));
+
+        var refreshToken = await dbContext.RefreshTokens
+            .FirstOrDefaultAsync(x => x.TokenHash == tokenHash, cancellationToken);
+
+        if (refreshToken is null)
+        {
+            throw new UnauthorizedAccessException("Refresh token not found.");
+        }
+
+        if (refreshToken.IsRevoked)
+        {
+            logger.LogWarning("Use of revoked token. Revoking token group.");
+
+            await dbContext.RefreshTokens
+                .Where(x => x.GroupId == refreshToken.GroupId)
+                .ExecuteUpdateAsync(setters =>
+                {
+                    setters.SetProperty(x => x.IsRevoked, true);
+                    setters.SetProperty(x => x.RevokedAtUtc, utcNow);
+                    setters.SetProperty(x => x.RevokeReason, "revoked_token");
+                    setters.SetProperty(x => x.LastModifiedAtUtc, utcNow);
+                }, cancellationToken);
+
+            throw new UnauthorizedAccessException("Token is revoked.");
+        }
+
+        if (refreshToken.ExpiresAtUtc <= utcNow)
+        {
+            throw new UnauthorizedAccessException("Refresh token is expired.");
+        }
+
+        var user = await userManager.FindByIdAsync(refreshToken.UserId.ToString());
+
+        if (user is null)
+        {
+            throw new UnauthorizedAccessException("User not found.");
+        }
+
+        var roles = await userManager.GetRolesAsync(user);
+
+        var newAccessToken = jsonWebTokenService.CreateToken(user, roles);
+
+        refreshToken.IsRevoked = true;
+        refreshToken.RevokedAtUtc = utcNow;
+        refreshToken.RevokeReason = "token_refresh";
+
+        var newRefreshTokenAsBytes = RandomNumberGenerator.GetBytes(64);
+        var newRefreshTokenAsString = Convert.ToBase64String(newRefreshTokenAsBytes);
+
+        var newRefreshToken = new RefreshToken
+        {
+            UserId = refreshToken.UserId,
+            TokenHash = Convert.ToHexString(SHA256.HashData(newRefreshTokenAsBytes)),
+            GroupId = refreshToken.GroupId,
+            ExpiresAtUtc = utcNow.Add(refreshTokenOptions.Value.Expiration),
+            IsRevoked = false
+        };
+
+        dbContext.RefreshTokens.Add(newRefreshToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        Response.Cookies.Append("refresh_token", newRefreshTokenAsString, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = newRefreshToken.ExpiresAtUtc,
+        });
+
+        return Ok(new { AccessToken = newAccessToken });
     }
 }
