@@ -166,6 +166,8 @@ public class UsersController(
         if (!Request.Cookies.TryGetValue("refresh_token", out var refreshTokenAsString) ||
             string.IsNullOrEmpty(refreshTokenAsString))
         {
+            logger.LogWarning("Refresh token cookie is missing.");
+
             throw new UnauthorizedAccessException("Refresh token cookie not found.");
         }
 
@@ -179,20 +181,25 @@ public class UsersController(
 
         if (refreshToken is null)
         {
+            logger.LogWarning("Refresh token was not found.");
+
             throw new UnauthorizedAccessException("Refresh token not found.");
         }
 
         if (refreshToken.IsRevoked)
         {
-            logger.LogWarning("Use of revoked token. Revoking token group.");
+            logger.LogWarning(
+                "Refresh token reuse detected for user {UserId} and token group {GroupId}. Revoking token group.",
+                refreshToken.UserId,
+                refreshToken.GroupId);
 
             await dbContext.RefreshTokens
-                .Where(x => x.GroupId == refreshToken.GroupId)
+                .Where(x => x.GroupId == refreshToken.GroupId && !x.IsRevoked)
                 .ExecuteUpdateAsync(setters =>
                 {
                     setters.SetProperty(x => x.IsRevoked, true);
                     setters.SetProperty(x => x.RevokedAtUtc, utcNow);
-                    setters.SetProperty(x => x.RevokeReason, "revoked_token");
+                    setters.SetProperty(x => x.RevokeReason, "token_reuse_detected");
                     setters.SetProperty(x => x.LastModifiedAtUtc, utcNow);
                 }, cancellationToken);
 
@@ -201,6 +208,11 @@ public class UsersController(
 
         if (refreshToken.ExpiresAtUtc <= utcNow)
         {
+            logger.LogWarning(
+                "Expired refresh token used by user {UserId}. Token expired at {ExpiresAtUtc}.",
+                refreshToken.UserId,
+                refreshToken.ExpiresAtUtc);
+
             throw new UnauthorizedAccessException("Refresh token is expired.");
         }
 
@@ -208,6 +220,8 @@ public class UsersController(
 
         if (user is null)
         {
+            logger.LogWarning("User {UserId} associated with refresh token was not found.", refreshToken.UserId);
+
             throw new UnauthorizedAccessException("User not found.");
         }
 
@@ -242,6 +256,11 @@ public class UsersController(
             SameSite = SameSiteMode.Strict,
             Expires = newRefreshToken.ExpiresAtUtc,
         });
+
+        logger.LogInformation(
+            "Refresh token successfully rotated for user {UserId} and token group {GroupId}.",
+            refreshToken.UserId,
+            refreshToken.GroupId);
 
         return Ok(new { AccessToken = newAccessToken });
     }
