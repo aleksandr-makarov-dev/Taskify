@@ -67,10 +67,11 @@ public class UsersController(
     }
 
     [HttpPost("login/password")]
-    [Validate(typeof(LoginUserRequest))]
-    public async Task<IActionResult> LoginUser([FromBody] LoginUserRequest request, CancellationToken cancellationToken)
+    [Validate(typeof(LoginUserByPasswordRequest))]
+    public async Task<IActionResult> LoginUserByPassword([FromBody] LoginUserByPasswordRequest byPasswordRequest,
+        CancellationToken cancellationToken)
     {
-        var existingUser = await userManager.FindByEmailAsync(request.Email);
+        var existingUser = await userManager.FindByEmailAsync(byPasswordRequest.Email);
 
         if (existingUser is null)
         {
@@ -78,7 +79,8 @@ public class UsersController(
         }
 
         var checkPasswordResult =
-            await signInManager.CheckPasswordSignInAsync(existingUser, request.Password, lockoutOnFailure: true);
+            await signInManager.CheckPasswordSignInAsync(existingUser, byPasswordRequest.Password,
+                lockoutOnFailure: true);
 
         if (!checkPasswordResult.Succeeded)
         {
@@ -112,6 +114,113 @@ public class UsersController(
             TokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenAsBytes)),
             GroupId = Guid.NewGuid(),
             ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime.Add(refreshTokenOptions.Value.Expiration),
+            IsRevoked = false
+        };
+
+        dbContext.RefreshTokens.Add(refreshToken);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        var accessToken = jsonWebTokenService.CreateToken(existingUser, userRoles);
+
+        Response.Cookies.Append("refresh_token", refreshTokenAsString, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Expires = refreshToken.ExpiresAtUtc,
+        });
+
+        return Ok(new { AccessToken = accessToken });
+    }
+
+    [HttpPost("login/email")]
+    [Validate(typeof(LoginUserByEmailRequest))]
+    public async Task<IActionResult> LoginUserByEmail([FromBody] LoginUserByEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existingUser = await userManager.FindByEmailAsync(request.Email);
+
+        if (existingUser is null)
+        {
+            // if user does not exist, create new user
+            var user = new User
+            {
+                UserName = request.Email,
+                Email = request.Email,
+                EmailConfirmed = false
+            };
+
+            var createUserResult = await userManager.CreateAsync(user);
+
+            if (!createUserResult.Succeeded)
+            {
+                var error = createUserResult.Errors.FirstOrDefault();
+                throw new BadRequestException(error?.Description ?? "Failed to create user.");
+            }
+
+            await userManager.AddToRoleAsync(user, RoleNames.User);
+
+            existingUser = user;
+        }
+
+        var emailConfirmationToken = await userManager.GenerateEmailConfirmationTokenAsync(existingUser);
+
+        logger.LogInformation("Email confirmation token: {EmailConfirmationToken}", emailConfirmationToken);
+
+        return Ok();
+    }
+
+    [HttpPost("login/email/verify")]
+    [Validate(typeof(VerifyLoginUserByEmailRequest))]
+    public async Task<IActionResult> VerifyLoginUserByEmail(
+        [FromBody] VerifyLoginUserByEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        var existingUser = await userManager.FindByEmailAsync(request.Email);
+
+        if (existingUser is null)
+        {
+            throw new UnauthorizedAccessException("The email address or verification link is invalid.");
+        }
+
+        var isValid = await userManager.VerifyUserTokenAsync(
+            existingUser,
+            TokenOptions.DefaultProvider,
+            UserManager<User>.ConfirmEmailTokenPurpose,
+            request.Token);
+
+        if (!isValid)
+        {
+            throw new UnauthorizedAccessException("The verification link is invalid or has expired.");
+        }
+
+        if (!existingUser.EmailConfirmed)
+        {
+            existingUser.EmailConfirmed = true;
+
+            var updateResult = await userManager.UpdateAsync(existingUser);
+
+            if (!updateResult.Succeeded)
+            {
+                var error = updateResult.Errors.FirstOrDefault();
+
+                throw new InvalidOperationException(error?.Description ?? "Failed to confirm the email address.");
+            }
+        }
+
+        var userRoles = await userManager.GetRolesAsync(existingUser);
+
+        var refreshTokenAsBytes = RandomNumberGenerator.GetBytes(64);
+        var refreshTokenAsString = Convert.ToBase64String(refreshTokenAsBytes);
+
+        var refreshToken = new RefreshToken
+        {
+            UserId = existingUser.Id,
+            TokenHash = Convert.ToHexString(SHA256.HashData(refreshTokenAsBytes)),
+            GroupId = Guid.NewGuid(),
+            ExpiresAtUtc = timeProvider.GetUtcNow().UtcDateTime
+                .Add(refreshTokenOptions.Value.Expiration),
             IsRevoked = false
         };
 

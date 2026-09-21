@@ -3,7 +3,7 @@ using Taskify.WebApi.Contracts.Requests;
 
 namespace Taskify.WebApi.Contracts.Validators;
 
-public sealed class LoginUserByPasswordValidator : AbstractValidator<RegisterUserRequest>
+public sealed class LoginUserByPasswordValidator : AbstractValidator<LoginUserByPasswordRequest>
 {
     public LoginUserByPasswordValidator()
     {
