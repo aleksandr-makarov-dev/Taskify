@@ -3,7 +3,7 @@ using Taskify.WebApi.Contracts.Requests;
 
 namespace Taskify.WebApi.Contracts.Validators;
 
-public sealed class UpdateItemValidator : AbstractValidator<CreateItemRequest>
+public sealed class UpdateItemValidator : AbstractValidator<UpdateItemRequest>
 {
     public UpdateItemValidator(TimeProvider timeProvider)
     {

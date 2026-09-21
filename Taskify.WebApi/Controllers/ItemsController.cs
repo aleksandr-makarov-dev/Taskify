@@ -12,7 +12,6 @@ using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Controllers;
 
-[Authorize(Roles = RoleNames.User)]
 [ApiController]
 [ApiVersion(1.0)]
 [Route("api/v{version:apiVersion}/items")]

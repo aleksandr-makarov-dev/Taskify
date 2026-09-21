@@ -3,9 +3,9 @@ using Taskify.WebApi.Contracts.Requests;
 
 namespace Taskify.WebApi.Contracts.Validators;
 
-public sealed class LoginUserValidator : AbstractValidator<RegisterUserRequest>
+public sealed class LoginUserByPasswordValidator : AbstractValidator<RegisterUserRequest>
 {
-    public LoginUserValidator()
+    public LoginUserByPasswordValidator()
     {
         RuleFor(x => x.Email)
             .NotEmpty()
