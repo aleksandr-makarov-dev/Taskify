@@ -17,3 +17,5 @@
 - [x] Refresh token reuse detection & bulk revocation (Token groups)
 - [x] API Versioning (`/api/v{version}/...`)
 - [x] Account lockout and sign-in protection mechanisms
+- [x] Email authentication via magic links
+- [x] External authentication providers (Google & GitHub)
