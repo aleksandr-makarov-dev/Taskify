@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Taskify.WebApi.Infrastructure.Options;
 using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Infrastructure.BackgroundServices;
@@ -6,16 +8,14 @@ namespace Taskify.WebApi.Infrastructure.BackgroundServices;
 public sealed class ItemExpirationBackgroundService(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<ItemExpirationBackgroundService> logger,
-    TimeProvider timeProvider) : BackgroundService
+    TimeProvider timeProvider,
+    IOptions<ItemExpirationOptions> options) : BackgroundService
 {
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
-    private const int BatchSize = 1000;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        logger.LogInformation("Expiration checker started. Interval: {Interval}", CheckInterval);
+        logger.LogInformation("Expiration checker started. Interval: {Interval}", options.Value.CheckInterval);
 
-        using var timer = new PeriodicTimer(CheckInterval, timeProvider);
+        using var timer = new PeriodicTimer(options.Value.CheckInterval, timeProvider);
 
         try
         {
@@ -51,7 +51,7 @@ public sealed class ItemExpirationBackgroundService(
                 x.DueDateOnUtc.HasValue &&
                 x.DueDateOnUtc <= utcNow)
             .OrderBy(x => x.DueDateOnUtc)
-            .Take(BatchSize)
+            .Take(options.Value.BatchSize)
             .ExecuteUpdateAsync(setters =>
             {
                 setters

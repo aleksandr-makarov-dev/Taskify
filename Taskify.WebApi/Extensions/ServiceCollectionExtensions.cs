@@ -104,6 +104,21 @@ public static class ServiceCollectionExtensions
             .BindConfiguration(JsonWebTokenOptions.SectionName)
             .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        services.AddOptions<RefreshTokenOptions>()
+            .BindConfiguration(RefreshTokenOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<ItemExpirationOptions>()
+            .BindConfiguration(ItemExpirationOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<SoftDeleteOptions>()
+            .BindConfiguration(SoftDeleteOptions.SectionName)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
     }
 
     private static void AddHostedServices(this IServiceCollection services)
@@ -162,7 +177,7 @@ public static class ServiceCollectionExtensions
                 Title = "Taskify API",
                 Version = "v1"
             });
-            
+
             options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.Http,
@@ -170,7 +185,7 @@ public static class ServiceCollectionExtensions
                 BearerFormat = "JWT",
                 Description = "Enter JWT token only (without 'Bearer ')"
             });
-            
+
             options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
             {
                 [new OpenApiSecuritySchemeReference("bearer", document)] = []

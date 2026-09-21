@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Taskify.WebApi.Infrastructure.Options;
 using Taskify.WebApi.Persistence;
 
 namespace Taskify.WebApi.Infrastructure.BackgroundServices;
@@ -6,20 +8,17 @@ namespace Taskify.WebApi.Infrastructure.BackgroundServices;
 public sealed class SoftDeleteBackgroundService(
     IServiceScopeFactory serviceScopeFactory,
     ILogger<SoftDeleteBackgroundService> logger,
-    TimeProvider timeProvider) : BackgroundService
+    TimeProvider timeProvider,
+    IOptions<SoftDeleteOptions> options) : BackgroundService
 {
-    private static readonly TimeSpan RetentionPeriod = TimeSpan.FromMinutes(15);
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(5);
-    private const int BatchSize = 1000;
-
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         logger.LogInformation(
             "Soft-delete cleanup background service started. Check interval: {CheckInterval}, retention period: {RetentionPeriod}.",
-            CheckInterval,
-            RetentionPeriod);
+            options.Value.CheckInterval,
+            options.Value.RetentionPeriod);
 
-        using var timer = new PeriodicTimer(CheckInterval, timeProvider);
+        using var timer = new PeriodicTimer(options.Value.CheckInterval, timeProvider);
 
         try
         {
@@ -47,13 +46,13 @@ public sealed class SoftDeleteBackgroundService(
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
         var utcNow = timeProvider.GetUtcNow().UtcDateTime;
-        var expirationTime = utcNow - RetentionPeriod;
+        var expirationTime = utcNow - options.Value.RetentionPeriod;
 
         var count = await dbContext.Items
             .IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(x => x.IsDeleted && x.DeletedAtUtc.HasValue && x.DeletedAtUtc.Value <= expirationTime)
             .OrderBy(x => x.DeletedAtUtc)
-            .Take(BatchSize)
+            .Take(options.Value.BatchSize)
             .ExecuteDeleteAsync(cancellationToken);
 
         if (count > 0)
