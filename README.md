@@ -10,3 +10,10 @@
 - [x] EF Core persistence and migrations
 - [x] Integration testing
 - [x] Dockerized deployment
+- [x] User authentication and registration (Identity framework integration)
+- [x] Email verification support
+- [x] JWT token authentication (Access token generation)
+- [x] Secure Refresh Token rotation with HttpOnly cookies
+- [x] Refresh token reuse detection & bulk revocation (Token groups)
+- [x] API Versioning (`/api/v{version}/...`)
+- [x] Account lockout and sign-in protection mechanisms
