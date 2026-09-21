@@ -78,6 +78,11 @@ public class UsersController(
             throw new UnauthorizedAccessException("User not found.");
         }
 
+        if (!await userManager.HasPasswordAsync(existingUser))
+        {
+            throw new UnauthorizedAccessException("Use other sign in method.");
+        }
+
         var checkPasswordResult =
             await signInManager.CheckPasswordSignInAsync(existingUser, byPasswordRequest.Password,
                 lockoutOnFailure: true);
