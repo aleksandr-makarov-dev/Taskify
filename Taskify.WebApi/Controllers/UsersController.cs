@@ -399,7 +399,7 @@ public class UsersController(
     }
 
     [HttpGet("login/external/callback")]
-    public async Task<IActionResult> LoginUserByExternalCallback(CancellationToken cancellationToken)
+    public async Task<IActionResult> LoginUserByExternalProviderCallback(CancellationToken cancellationToken)
     {
         var externalLoginInfo = await signInManager.GetExternalLoginInfoAsync();
 
